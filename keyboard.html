@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Keyboard</title>
+    <style>
+      /* styles.css */
+
+/* Default Theme */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+textarea {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* Keyboard Styles */
+#keyboard {
+    display: grid;
+    grid-template-columns: repeat(15, 1fr);
+    gap: 5px;
+}
+
+.key {
+    padding: 15px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+/* Dark Theme */
+body.dark {
+    background-color: #222;
+    color: #fff;
+}
+
+.dark textarea {
+    background-color: #333;
+    color: #fff;
+}
+
+/* Light Theme */
+body.light {
+    background-color: #ffffff;
+    color: #000;
+}
+
+.light textarea {
+    background-color: #f9f9f9;
+    color: #000;
+}
+
+/* Additional Keyboard Styles */
+.dark .key {
+    background-color: #444;
+    color: #fff;
+}
+
+.light .key {
+    background-color: #ddd;
+    color: #000;
+}
+
+.key:hover {
+    opacity: 0.7;
+}
+
+
+    </style>
+</head>
+<body>
+    <h1>Virtual Keyboard</h1>
+    
+    <label for="theme-selector">Choose a theme:</label>
+    <select id="theme-selector">
+        <option value="default">Default</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+    </select>
+    
+    <textarea id="text-input" rows="10" cols="50"></textarea>
+    <div id="keyboard"></div>
+
+   <script>
+    const themeSelector = document.getElementById('theme-selector');
+
+themeSelector.addEventListener('change', (event) => {
+    document.body.className = ''; // Reset classes
+    document.body.classList.add(event.target.value); // Add the selected theme class
+});
+    const keyboardLayout = [
+    ['Esc', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'],
+    ['~', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'Backspace'],
+    ['Tab', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'],
+    ['Caps Lock', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', '\'', 'Enter'],
+    ['Shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/', 'Shift'],
+    ['Ctrl', 'Alt', 'Space', 'Alt', 'Ctrl', '←', '↑', '↓', '→']
+];
+
+const keyboardContainer = document.getElementById('keyboard');
+const textInput = document.getElementById('text-input');
+let isShifted = false;
+let isCtrlPressed = false;
+let clipboard = '';
+let history = [];
+let redoHistory = [];
+
+function createKeyboard() {
+    keyboardLayout.forEach(row => {
+        row.forEach(key => {
+            const keyButton = document.createElement('button');
+            keyButton.textContent = key === 'Space' ? ' ' : key;
+            keyButton.classList.add('key');
+
+            keyButton.addEventListener('click', () => handleKeyPress(key));
+            keyboardContainer.appendChild(keyButton);
+        });
+    });
+}
+
+function handleKeyPress(key) {
+    switch (key) {
+        case 'Backspace':
+            textInput.value = textInput.value.slice(0, -1);
+            break;
+        case 'Tab':
+            textInput.value += '    '; // Adding four spaces for tab
+            break;
+        case 'Enter':
+            textInput.value += '\n';
+            break;
+        case 'Shift':
+            isShifted = !isShifted; // Toggle shift
+            break;
+        case 'Space':
+            textInput.value += ' ';
+            break;
+        case 'Ctrl':
+            isCtrlPressed = true; // Set Ctrl as pressed
+            break;
+        case 'Alt':
+            // For simplicity, do nothing for Alt in this example
+            break;
+        case '←':
+        case '↑':
+        case '↓':
+        case '→':
+            handleArrowKeys(key);
+            break;
+        default:
+            // Handle regular keys
+            const character = isShifted ? key.toUpperCase() : key.toLowerCase();
+            textInput.value += character;
+            break;
+    }
+
+    // Check for shortcuts here
+    if (isCtrlPressed) {
+        switch (key) {
+            case 'C':
+                copyToClipboard();
+                break;
+            case 'X':
+                cutSelectedText();
+                break;
+            case 'V':
+                pasteFromClipboard();
+                break;
+            case 'Z':
+                undoAction();
+                break;
+            case 'Y':
+                redoAction();
+                break;
+            case 'A':
+                selectAll();
+                break;
+            case 'B':
+                toggleBold();
+                break;
+            case 'I':
+                toggleItalic();
+                break;
+            case 'U':
+                toggleUnderline();
+                break;
+            case 'E':
+                alignText('center');
+                break;
+            case 'L':
+                alignText('left');
+                break;
+            case 'R':
+                alignText('right');
+                break;
+            case 'J':
+                alignText('justify');
+                break;
+        }
+    }
+}
+
+function copyToClipboard() {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+        clipboard = selectedText;
+        console.log('Copied to clipboard: ', clipboard);
+    }
+}
+
+function cutSelectedText() {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+        clipboard = selectedText;
+        textInput.value = textInput.value.replace(selectedText, '');
+        console.log('Cut to clipboard: ', clipboard);
+    }
+}
+
+function pasteFromClipboard() {
+    if (clipboard) {
+        const currentPos = textInput.selectionStart;
+        const textBefore = textInput.value.substring(0, currentPos);
+        const textAfter = textInput.value.substring(currentPos);
+        textInput.value = textBefore + clipboard + textAfter;
+        console.log('Pasted from clipboard: ', clipboard);
+    }
+}
+
+function undoAction() {
+    if (history.length > 0) {
+        redoHistory.push(textInput.value);
+        textInput.value = history.pop();
+        console.log('Undone to: ', textInput.value);
+    }
+}
+
+function redoAction() {
+    if (redoHistory.length > 0) {
+        history.push(textInput.value);
+        textInput.value = redoHistory.pop();
+        console.log('Redone to: ', textInput.value);
+    }
+}
+
+function selectAll() {
+    textInput.select();
+}
+
+function toggleBold() {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+        const isBold = textInput.style.fontWeight === 'bold';
+        textInput.style.fontWeight = isBold ? 'normal' : 'bold';
+        updateText(selectedText, isBold ? '' : '**'); // Example: using asterisks for bold
+    }
+}
+
+function toggleItalic() {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+        const isItalic = textInput.style.fontStyle === 'italic';
+        textInput.style.fontStyle = isItalic ? 'normal' : 'italic';
+        updateText(selectedText, isItalic ? '' : '*'); // Example: using asterisks for italic
+    }
+}
+
+function toggleUnderline() {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+        const isUnderline = textInput.style.textDecoration === 'underline';
+        textInput.style.textDecoration = isUnderline ? 'none' : 'underline';
+        updateText(selectedText, isUnderline ? '' : '__'); // Example: using underscores for underline
+    }
+}
+
+function alignText(alignment) {
+    textInput.style.textAlign = alignment;
+}
+
+function handleArrowKeys(key) {
+    const currentPos = textInput.selectionStart;
+
+    switch (key) {
+        case '←':
+            if (currentPos > 0) {
+                textInput.setSelectionRange(currentPos - 1, currentPos - 1);
+            }
+            break;
+        case '→':
+            if (currentPos < textInput.value.length) {
+                textInput.setSelectionRange(currentPos + 1, currentPos + 1);
+            }
+            break;
+        case '↑':
+        case '↓':
+            // Handle Up and Down arrow keys if needed
+            break;
+    }
+}
+
+// Utility Functions
+function getSelectedText() {
+    const start = textInput.selectionStart;
+    const end = textInput.selectionEnd;
+    return textInput.value.substring(start, end);
+}
+
+function updateText(selectedText, formatting) {
+    const start = textInput.selectionStart;
+    const end = textInput.selectionEnd;
+    textInput.value = textInput.value.substring(0, start) +
+        formatting + selectedText + formatting + 
+        textInput.value.substring(end);
+    textInput.setSelectionRange(start, end + formatting.length * 2); // Adjust selection range
+}
+
+// To handle when Ctrl is released
+document.addEventListener('keyup', (event) => {
+    if (event.key === 'Control') {
+        isCtrlPressed = false; // Set Ctrl as not pressed
+    }
+    // Store the current state for undo/redo
+    history.push(textInput.value);
+});
+
+createKeyboard();
+
+
+
+   </script>
+</body>
+</html>
